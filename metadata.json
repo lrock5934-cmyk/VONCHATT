@@ -1,0 +1,6 @@
+{
+  "name": "vonChat",
+  "description": "A calm, responsive real-time messaging web application built with React, TypeScript, Vite, Tailwind CSS v4, and Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
