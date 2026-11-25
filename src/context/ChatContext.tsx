@@ -264,20 +264,25 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signIn = async (email: string, pass: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, pass);
+      const normalizedEmail = email.trim().toLowerCase();
+      await signInWithEmailAndPassword(auth, normalizedEmail, pass);
       return { error: null };
     } catch (error: any) {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        return { error: new Error('Incorrect email or password. Please check your details or reset your password.') };
+      }
       return { error };
     }
   };
 
   const signUp = async (email: string, pass: string, name: string) => {
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      const normalizedEmail = email.trim().toLowerCase();
+      const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, pass);
       if (cred.user) {
         await supabase.from('profiles').upsert({
           id: cred.user.uid,
-          email: cred.user.email || email,
+          email: cred.user.email || normalizedEmail,
           display_name: name,
           avatar_color: 'bg-[#E50914] text-white',
           is_online: true,
@@ -286,6 +291,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       return { error: null };
     } catch (error: any) {
+      if (error.code === 'auth/email-already-in-use') {
+        return { error: new Error('An account with this email already exists. Please sign in instead.') };
+      }
       return { error };
     }
   };
@@ -320,9 +328,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const resetPassword = async (email: string) => {
     try {
-      await sendPasswordResetEmail(auth, email);
+      const normalizedEmail = email.trim().toLowerCase();
+      await sendPasswordResetEmail(auth, normalizedEmail);
       return { error: null };
     } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        return { error: new Error('No account found with this email address.') };
+      }
       return { error };
     }
   };

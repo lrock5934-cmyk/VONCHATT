@@ -20,9 +20,11 @@ export const AuthView: React.FC = () => {
     setSuccessMsg('');
     setLoading(true);
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     try {
       if (isForgot) {
-        const { error } = await resetPassword(email);
+        const { error } = await resetPassword(normalizedEmail);
         if (error) throw error;
         setSuccessMsg('Password reset instructions sent to your email.');
       } else if (isSignUp) {
@@ -31,11 +33,11 @@ export const AuthView: React.FC = () => {
           setLoading(false);
           return;
         }
-        const { error } = await signUp(email, password, displayName);
+        const { error } = await signUp(normalizedEmail, password, displayName);
         if (error) throw error;
         setSuccessMsg('Registration successful! Please check your email for verification if needed.');
       } else {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(normalizedEmail, password);
         if (error) throw error;
       }
     } catch (err: any) {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ChatProvider, useChat } from './context/ChatContext';
 import { AuthView } from './components/auth/AuthView';
+import { PolicyAgreementScreen } from './components/auth/PolicyAgreementScreen';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatArea } from './components/layout/ChatArea';
 import { ProfileModal } from './components/modals/ProfileModal';
@@ -11,9 +12,20 @@ import { SearchModal } from './components/modals/SearchModal';
 import { StatusComposerModal } from './components/modals/StatusComposerModal';
 import { StatusViewerModal } from './components/modals/StatusViewerModal';
 import { Loader2, Flame } from 'lucide-react';
+import { supabase } from './lib/supabase';
+
+const POLICY_VERSION = '1.0.0';
 
 const MainApp: React.FC = () => {
-  const { user, loading, activeConversationId } = useChat();
+  const { user, firebaseUser, loading, activeConversationId } = useChat();
+
+  const [policyAccepted, setPolicyAccepted] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(`vonchat_policy_accepted_v${POLICY_VERSION}`) === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
 
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -23,6 +35,25 @@ const MainApp: React.FC = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showStatusComposer, setShowStatusComposer] = useState(false);
   const [viewingStatusId, setViewingStatusId] = useState<string | null>(null);
+
+  const handleAgreePolicy = async () => {
+    try {
+      localStorage.setItem(`vonchat_policy_accepted_v${POLICY_VERSION}`, 'true');
+      setPolicyAccepted(true);
+      if (firebaseUser) {
+        await supabase.from('policy_acceptances').upsert({
+          firebase_uid: firebaseUser.uid,
+          terms_version: POLICY_VERSION,
+          privacy_version: POLICY_VERSION,
+          community_guidelines_version: POLICY_VERSION,
+          accepted_at: new Date().toISOString()
+        }, { onConflict: 'firebase_uid' });
+      }
+    } catch (e) {
+      console.error('Error saving policy acceptance:', e);
+      setPolicyAccepted(true);
+    }
+  };
 
   if (loading) {
     return (
@@ -35,6 +66,11 @@ const MainApp: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // Enforce WhatsApp-style policy agreement screen before any auth or app access
+  if (!policyAccepted) {
+    return <PolicyAgreementScreen onAgree={handleAgreePolicy} />;
   }
 
   if (!user) {
