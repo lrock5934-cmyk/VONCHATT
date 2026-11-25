@@ -1,7 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Profile, Conversation, Message, Status, Sticker } from '../types';
 import { supabase, isSupabaseConfigured, setSupabaseAuthToken } from '../lib/supabase';
-import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, sendPasswordResetEmail, onAuthStateChanged, User } from '../lib/firebase';
+import { 
+  auth, 
+  googleProvider, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  sendPasswordResetEmail, 
+  onAuthStateChanged, 
+  User 
+} from '../lib/firebase';
 import { playMessagePop } from '../lib/audio';
 
 interface ChatContextType {
@@ -67,6 +79,25 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'chats' | 'archived'>('chats');
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+
+  // Handle Google redirect result on mount
+  useEffect(() => {
+    getRedirectResult(auth).then(async (result) => {
+      if (result?.user) {
+        const fUser = result.user;
+        await supabase.from('profiles').upsert({
+          id: fUser.uid,
+          email: fUser.email || '',
+          display_name: fUser.displayName || fUser.email?.split('@')[0] || 'Google User',
+          avatar_color: 'bg-[#E50914] text-white',
+          is_online: true,
+          status_message: 'Online via Google Auth 🔥'
+        });
+      }
+    }).catch((err) => {
+      console.error('Google Redirect result error:', err);
+    });
+  }, []);
 
   // Firebase Auth listener
   useEffect(() => {
@@ -243,7 +274,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = async (email: string, pass: string, name: string) => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      // Create profile in Supabase
       if (cred.user) {
         await supabase.from('profiles').upsert({
           id: cred.user.uid,
@@ -262,18 +292,25 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signInWithGoogle = async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const fUser = result.user;
-      if (fUser) {
-        // Upsert profile in Supabase
-        await supabase.from('profiles').upsert({
-          id: fUser.uid,
-          email: fUser.email || '',
-          display_name: fUser.displayName || fUser.email?.split('@')[0] || 'Google User',
-          avatar_color: 'bg-[#E50914] text-white',
-          is_online: true,
-          status_message: 'Online via Google Auth 🔥'
-        });
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const fUser = result.user;
+        if (fUser) {
+          await supabase.from('profiles').upsert({
+            id: fUser.uid,
+            email: fUser.email || '',
+            display_name: fUser.displayName || fUser.email?.split('@')[0] || 'Google User',
+            avatar_color: 'bg-[#E50914] text-white',
+            is_online: true,
+            status_message: 'Online via Google Auth 🔥'
+          });
+        }
+      } catch (popupErr: any) {
+        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/popup-closed-by-user' || popupErr.code === 'auth/cancelled-popup-request') {
+          await signInWithRedirect(auth, googleProvider);
+        } else {
+          throw popupErr;
+        }
       }
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);

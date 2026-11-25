@@ -8,8 +8,8 @@ const getStoredConfig = () => {
     // ignore
   }
   return {
-    url: import.meta.env.VITE_SUPABASE_URL || 'https://ulozcdnmdcpstnabmjqs.supabase.co',
-    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsb3pjZG5tZGNwc3RuYWJtanFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzNzk3MjMsImV4cCI6MjA1NTk1NTcyM30',
+    url: import.meta.env.VITE_SUPABASE_URL || 'https://foqsoghrfavskuyjxckc.supabase.co',
+    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvcXNvZ2hyZmF2c2t1anhja2MiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc0MDM3OTcyMywiZXhwIjoyMDU1OTU1NzIzfQ.placeholder',
   };
 };
 
@@ -47,7 +47,6 @@ export const supabase = getSupabase();
 
 export function setSupabaseAuthToken(token: string | null) {
   currentAuthToken = token;
-  // Recreate client with new authorization header
   cachedSupabaseClient = createClient(
     SUPABASE_URL,
     SUPABASE_ANON_KEY,

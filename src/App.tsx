@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AuthProvider } from './context/AuthContext';
 import { ChatProvider, useChat } from './context/ChatContext';
 import { AuthView } from './components/auth/AuthView';
 import { Sidebar } from './components/layout/Sidebar';
@@ -9,7 +10,7 @@ import { GroupModal } from './components/modals/GroupModal';
 import { SearchModal } from './components/modals/SearchModal';
 import { StatusComposerModal } from './components/modals/StatusComposerModal';
 import { StatusViewerModal } from './components/modals/StatusViewerModal';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Flame } from 'lucide-react';
 
 const MainApp: React.FC = () => {
   const { user, loading, activeConversationId } = useChat();
@@ -25,10 +26,12 @@ const MainApp: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[#F4F8F5]">
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#050505] text-white">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-[#15803D] animate-spin" />
-          <span className="text-sm font-semibold text-[#112419]">Loading botanical workspace...</span>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#E50914] to-[#FF303B] flex items-center justify-center shadow-lg shadow-[#E50914]/30 animate-pulse">
+            <Flame className="w-6 h-6 text-white" />
+          </div>
+          <span className="text-sm font-semibold text-[#A1A1AA]">Initializing vonChat Obsidian...</span>
         </div>
       </div>
     );
@@ -51,7 +54,7 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-[#F4F8F5] text-[#112419]">
+    <div className="h-screen w-screen flex overflow-hidden bg-[#050505] text-white">
       {/* Sidebar: hidden on mobile when conversation is active */}
       <div className={`${activeConversationId ? 'hidden md:flex' : 'flex'} w-full md:w-auto h-full`}>
         <Sidebar
@@ -106,8 +109,10 @@ const MainApp: React.FC = () => {
 
 export default function App() {
   return (
-    <ChatProvider>
-      <MainApp />
-    </ChatProvider>
+    <AuthProvider>
+      <ChatProvider>
+        <MainApp />
+      </ChatProvider>
+    </AuthProvider>
   );
 }
