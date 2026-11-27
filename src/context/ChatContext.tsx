@@ -43,7 +43,7 @@ interface ChatContextType {
   signInWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
   sendMessage: (content: string, type?: 'text' | 'image' | 'sticker' | 'audio', mediaUrl?: string) => Promise<void>;
   sendReaction: (messageId: string, emoji: string) => Promise<void>;
   pinMessage: (messageId: string) => Promise<void>;
@@ -349,10 +349,67 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!user) return;
-    const updated = { ...user, ...updates };
+    if (!user) return { error: new Error('Not authenticated') };
+
+    const payload: Partial<Profile> = { ...updates };
+
+    if (updates.username !== undefined) {
+      const rawUsername = updates.username.trim().replace(/^@/, '');
+      const reserved = ['admin', 'support', 'vonchat', 'system', 'root', 'api'];
+
+      if (!rawUsername) {
+        return { error: new Error('Username cannot be empty.') };
+      }
+      if (rawUsername.length < 3 || rawUsername.length > 24) {
+        return { error: new Error('Username must be between 3 and 24 characters.') };
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(rawUsername)) {
+        return { error: new Error('Username can only contain letters, numbers, and underscores.') };
+      }
+      if (reserved.includes(rawUsername.toLowerCase())) {
+        return { error: new Error('This username is reserved and cannot be used.') };
+      }
+
+      const normalized = rawUsername.toLowerCase();
+
+      // Check uniqueness if changed
+      if (normalized !== user.username_normalized) {
+        const { data: existing, error: checkErr } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username_normalized', normalized)
+          .neq('id', user.id)
+          .maybeSingle();
+
+        if (checkErr) {
+          console.error('Error checking username uniqueness:', checkErr);
+        }
+        if (existing) {
+          return { error: new Error('Username is already taken by another user.') };
+        }
+      }
+
+      payload.username = rawUsername;
+      payload.username_normalized = normalized;
+    }
+
+    const updated = { ...user, ...payload };
     setUser(updated);
-    await supabase.from('profiles').update(updates).eq('id', user.id);
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update(payload)
+      .eq('id', user.id);
+
+    if (updateErr) {
+      return { error: updateErr };
+    }
+
+    // Refresh allUsers list
+    const { data: profilesList } = await supabase.from('profiles').select('*');
+    if (profilesList) setAllUsers(profilesList);
+
+    return { error: null };
   };
 
   const sendMessage = async (content: string, type: 'text' | 'image' | 'sticker' | 'audio' = 'text', mediaUrl?: string) => {

@@ -11,23 +11,35 @@ interface ProfileModalProps {
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
   const { user, updateProfile, signOut, fontSize, setFontSize, soundEnabled, setSoundEnabled } = useChat();
   const [displayName, setDisplayName] = useState(user?.display_name || '');
+  const [username, setUsername] = useState(user?.username || '');
   const [statusMessage, setStatusMessage] = useState(user?.status_message || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [isOnline, setIsOnline] = useState(user?.is_online ?? true);
   const [selectedWallpaper, setSelectedWallpaper] = useState(user?.chat_wallpaper || 'wp-1');
   const [saved, setSaved] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
   if (!isOpen || !user) return null;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await updateProfile({
+    setProfileError('');
+    setSaved(false);
+
+    const { error } = await updateProfile({
+      username,
       display_name: displayName,
       status_message: statusMessage,
       bio,
       is_online: isOnline,
       chat_wallpaper: selectedWallpaper
     });
+
+    if (error) {
+      setProfileError(error.message || 'Failed to update profile.');
+      return;
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -52,6 +64,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           </div>
         )}
 
+        {profileError && (
+          <div className="my-4 p-3 bg-red-950/60 border border-red-800 text-red-200 text-sm rounded-xl">
+            {profileError}
+          </div>
+        )}
+
         <form onSubmit={handleSave} className="space-y-5 pt-4">
           <div className="flex items-center gap-4">
             <div className={`w-16 h-16 rounded-2xl ${user.avatar_color} border border-[#292929] flex items-center justify-center text-xl font-bold shadow-md`}>
@@ -64,6 +82,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 {isOnline ? 'Active Online' : 'Offline'}
               </div>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#A1A1AA] mb-1">
+              Username (@username)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-2.5 text-[#71717A] text-sm font-semibold">@</span>
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                maxLength={24}
+                placeholder="lilrock"
+                className="w-full pl-8 pr-3 py-2 bg-[#181818] border border-[#292929] rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#E50914]"
+              />
+            </div>
+            <p className="text-[11px] text-[#71717A] mt-1">3–24 chars, letters, numbers, underscores only.</p>
           </div>
 
           <div>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useChat } from '../../context/ChatContext';
-import { Search, X, MessageSquare, Users, UserPlus, Check } from 'lucide-react';
-import { AVATAR_COLORS } from '../../lib/stickers';
+import { Search, X, MessageSquare, Users, UserPlus, CheckCircle2 } from 'lucide-react';
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -15,12 +14,17 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ isOpen, onClose, onO
 
   if (!isOpen) return null;
 
-  const filteredUsers = allUsers.filter(u => 
-    u.id !== user?.id && (
-      u.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const cleanQuery = searchTerm.trim().toLowerCase().replace(/^@/, '');
+
+  const filteredUsers = allUsers.filter(u => {
+    if (u.id === user?.id) return false;
+    if (u.is_discoverable === false) return false;
+
+    const nameMatch = u.display_name.toLowerCase().includes(cleanQuery);
+    const usernameMatch = u.username && u.username.toLowerCase().includes(cleanQuery);
+
+    return nameMatch || usernameMatch;
+  });
 
   const handleStartChat = async (targetUserId: string) => {
     await createDirectChat(targetUserId);
@@ -28,67 +32,70 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ isOpen, onClose, onO
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#D5E3D9] flex flex-col max-h-[85vh]">
-        <div className="flex items-center justify-between pb-4 border-b border-[#D5E3D9]">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-white">
+      <div className="bg-[#111111] rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#292929] flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between pb-4 border-b border-[#292929]">
           <div className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-[#15803D]" />
-            <h2 className="text-lg font-bold text-[#112419]">Start New Chat</h2>
+            <UserPlus className="w-5 h-5 text-[#E50914]" />
+            <h2 className="text-lg font-bold text-white">Start New Chat</h2>
           </div>
-          <button onClick={onClose} className="p-1 text-stone-400 hover:text-stone-700 rounded-lg cursor-pointer">
+          <button onClick={onClose} className="p-1 text-[#71717A] hover:text-white rounded-lg cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="py-4">
           <div className="relative mb-4">
-            <Search className="absolute left-3.5 top-3 w-4 h-4 text-stone-400" />
+            <Search className="absolute left-3.5 top-3 w-4 h-4 text-[#71717A]" />
             <input
               type="text"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search by name, email, or Gmail..."
-              className="w-full pl-10 pr-4 py-2.5 bg-[#F4F8F5] border border-[#D5E3D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#15803D]"
+              placeholder="Search by name or @username..."
+              className="w-full pl-10 pr-4 py-2.5 bg-[#181818] border border-[#292929] rounded-xl text-sm text-white placeholder-[#71717A] focus:outline-none focus:ring-2 focus:ring-[#E50914]"
             />
           </div>
 
           <button
             onClick={() => { onClose(); onOpenGroupModal(); }}
-            className="w-full mb-4 p-3 bg-[#ECF3EE] border border-[#D5E3D9] rounded-xl text-sm font-semibold text-[#15803D] hover:bg-[#dcefe5] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full mb-4 p-3 bg-[#181818] border border-[#292929] rounded-xl text-sm font-semibold text-[#E50914] hover:bg-[#222222] transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <Users className="w-4 h-4" />
-            <span>Create Botanical Group Chat</span>
+            <span>Create Group Chat</span>
           </button>
 
-          <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">
-            Registered Directory Members ({filteredUsers.length})
+          <div className="text-xs font-semibold uppercase tracking-wider text-[#A1A1AA] mb-2">
+            Discoverable Users ({filteredUsers.length})
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
           {filteredUsers.length === 0 ? (
-            <div className="text-center py-8 text-stone-500 text-sm">
-              No members found matching "{searchTerm}"
+            <div className="text-center py-8 text-[#71717A] text-sm">
+              No users found matching "{searchTerm}"
             </div>
           ) : (
             filteredUsers.map(u => (
               <div
                 key={u.id}
                 onClick={() => handleStartChat(u.id)}
-                className="flex items-center justify-between p-3 rounded-xl border border-[#D5E3D9] hover:bg-[#ECF3EE] transition-colors cursor-pointer group"
+                className="flex items-center justify-between p-3 rounded-xl border border-[#292929] bg-[#181818] hover:bg-[#222222] transition-colors cursor-pointer group"
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl ${u.avatar_color || 'bg-emerald-700 text-white'} flex items-center justify-center font-bold text-sm shadow-sm`}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-10 h-10 rounded-xl ${u.avatar_color || 'bg-[#E50914] text-white'} flex items-center justify-center font-bold text-sm shadow-sm shrink-0`}>
                     {u.display_name.slice(0, 2).toUpperCase()}
                   </div>
-                  <div>
-                    <div className="font-semibold text-sm text-[#112419] group-hover:text-[#15803D] transition-colors">
-                      {u.display_name}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm text-white group-hover:text-[#E50914] transition-colors flex items-center gap-1.5 truncate">
+                      <span className="truncate">{u.display_name}</span>
+                      {u.is_verified && <CheckCircle2 className="w-3.5 h-3.5 text-[#E50914] shrink-0" />}
                     </div>
-                    <div className="text-xs text-stone-500">{u.email}</div>
+                    <div className="text-xs text-[#A1A1AA] truncate">
+                      {u.username ? `@${u.username}` : 'No username'} {u.bio ? `• ${u.bio}` : ''}
+                    </div>
                   </div>
                 </div>
-                <button className="p-2 bg-white border border-[#D5E3D9] rounded-lg text-[#15803D] group-hover:bg-[#15803D] group-hover:text-white transition-colors shadow-xs">
+                <button className="p-2 bg-[#111111] border border-[#292929] rounded-lg text-[#E50914] group-hover:bg-[#E50914] group-hover:text-white transition-colors shadow-xs shrink-0 ml-2">
                   <MessageSquare className="w-4 h-4" />
                 </button>
               </div>

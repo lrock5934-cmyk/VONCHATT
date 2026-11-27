@@ -1,11 +1,16 @@
 export interface Profile {
   id: string;
   email: string;
+  username?: string;
+  username_normalized?: string;
   display_name: string;
   avatar_color: string;
+  avatar_url?: string;
   is_online: boolean;
   status_message?: string;
   bio?: string;
+  is_verified?: boolean;
+  is_discoverable?: boolean;
   chat_wallpaper?: string;
   last_seen_at?: string;
   created_at?: string;
