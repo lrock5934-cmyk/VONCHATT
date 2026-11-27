@@ -127,24 +127,47 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserData = async (fUser: User) => {
     try {
       setLoading(true);
+      const token = await fUser.getIdToken();
+      setSupabaseAuthToken(token);
+
       // 1. Fetch or sync profile in Supabase using Firebase UID (`fUser.uid`)
       let { data: profileData, error: profileErr } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', fUser.uid)
-        .single();
+        .maybeSingle();
 
       if (profileErr || !profileData) {
+        const defaultUsername = fUser.email 
+          ? fUser.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') + Math.floor(100 + Math.random() * 900)
+          : `user_${fUser.uid.slice(0, 6)}`;
+
         const newProf = {
           id: fUser.uid,
           email: fUser.email || '',
-          display_name: fUser.displayName || fUser.email?.split('@')[0] || 'User',
+          username: defaultUsername,
+          username_normalized: defaultUsername.toLowerCase(),
+          display_name: fUser.displayName || fUser.email?.split('@')[0] || 'vonChat User',
+          avatar_url: fUser.photoURL || '',
           avatar_color: 'bg-[#E50914] text-white',
           is_online: true,
-          status_message: 'Online in Liquid Glass 🔥'
+          is_discoverable: true,
+          status_message: 'Online in vonChat Obsidian 🔥'
         };
-        await supabase.from('profiles').upsert(newProf);
-        profileData = newProf;
+        const { data: inserted, error: insertErr } = await supabase
+          .from('profiles')
+          .insert(newProf)
+          .select()
+          .single();
+
+        if (insertErr) {
+          await supabase.from('profiles').upsert(newProf);
+          profileData = newProf;
+        } else {
+          profileData = inserted || newProf;
+        }
+      } else {
+        await supabase.from('profiles').update({ is_online: true, last_seen_at: new Date().toISOString() }).eq('id', fUser.uid);
       }
 
       setUser(profileData);
@@ -280,13 +303,19 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const normalizedEmail = email.trim().toLowerCase();
       const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, pass);
       if (cred.user) {
+        const token = await cred.user.getIdToken();
+        setSupabaseAuthToken(token);
+        const defaultUsername = normalizedEmail.split('@')[0].replace(/[^a-z0-9_]/g, '') + Math.floor(100 + Math.random() * 900);
         await supabase.from('profiles').upsert({
           id: cred.user.uid,
           email: cred.user.email || normalizedEmail,
+          username: defaultUsername,
+          username_normalized: defaultUsername.toLowerCase(),
           display_name: name,
           avatar_color: 'bg-[#E50914] text-white',
           is_online: true,
-          status_message: 'Online in Liquid Glass 🔥'
+          is_discoverable: true,
+          status_message: 'Online in vonChat Obsidian 🔥'
         });
       }
       return { error: null };
@@ -300,24 +329,51 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signInWithGoogle = async () => {
     try {
+      let fUser = null;
       try {
         const result = await signInWithPopup(auth, googleProvider);
-        const fUser = result.user;
-        if (fUser) {
-          await supabase.from('profiles').upsert({
-            id: fUser.uid,
-            email: fUser.email || '',
-            display_name: fUser.displayName || fUser.email?.split('@')[0] || 'Google User',
-            avatar_color: 'bg-[#E50914] text-white',
-            is_online: true,
-            status_message: 'Online via Google Auth 🔥'
-          });
-        }
+        fUser = result.user;
       } catch (popupErr: any) {
         if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/popup-closed-by-user' || popupErr.code === 'auth/cancelled-popup-request') {
           await signInWithRedirect(auth, googleProvider);
+          return;
         } else {
           throw popupErr;
+        }
+      }
+
+      if (fUser) {
+        const token = await fUser.getIdToken(true);
+        setSupabaseAuthToken(token);
+        
+        const defaultUsername = fUser.email 
+          ? fUser.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') + Math.floor(100 + Math.random() * 900)
+          : `user_${fUser.uid.slice(0, 6)}`;
+
+        const { data: existing } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', fUser.uid)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabase.from('profiles').upsert({
+            id: fUser.uid,
+            email: fUser.email || '',
+            username: defaultUsername,
+            username_normalized: defaultUsername.toLowerCase(),
+            display_name: fUser.displayName || fUser.email?.split('@')[0] || 'Google User',
+            avatar_url: fUser.photoURL || '',
+            avatar_color: 'bg-[#E50914] text-white',
+            is_online: true,
+            is_discoverable: true,
+            status_message: 'Online via Google Auth 🔥'
+          });
+        } else {
+          await supabase.from('profiles').update({
+            is_online: true,
+            last_seen_at: new Date().toISOString()
+          }).eq('id', fUser.uid);
         }
       }
     } catch (error: any) {
