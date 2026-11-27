@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
-import { Search, X, MessageSquare, Users, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Search, X, MessageSquare, Users, UserPlus, CheckCircle2, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { Profile } from '../../types';
 
 interface NewChatModalProps {
   isOpen: boolean;
@@ -11,20 +13,64 @@ interface NewChatModalProps {
 export const NewChatModal: React.FC<NewChatModalProps> = ({ isOpen, onClose, onOpenGroupModal }) => {
   const { allUsers, user, createDirectChat } = useChat();
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<Profile[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const searchDb = async () => {
+      const query = searchTerm.trim();
+      if (!query) {
+        if (isMounted) setSearchResults([]);
+        return;
+      }
+
+      setSearching(true);
+      try {
+        const { data, error } = await supabase.rpc('search_users_by_username', {
+          search_query: query
+        });
+
+        if (!error && data) {
+          if (isMounted) setSearchResults(data as Profile[]);
+        } else {
+          // Fallback to local filtering of allUsers if RPC fails or isn't created yet
+          const clean = query.toLowerCase().replace(/^@/, '');
+          const localMatch = allUsers.filter(u => 
+            u.id !== user?.id && (
+              u.display_name.toLowerCase().includes(clean) ||
+              (u.username && u.username.toLowerCase().includes(clean))
+            )
+          );
+          if (isMounted) setSearchResults(localMatch);
+        }
+      } catch (e) {
+        console.error('Search error:', e);
+        const clean = query.toLowerCase().replace(/^@/, '');
+        const localMatch = allUsers.filter(u => 
+          u.id !== user?.id && (
+            u.display_name.toLowerCase().includes(clean) ||
+            (u.username && u.username.toLowerCase().includes(clean))
+          )
+        );
+        if (isMounted) setSearchResults(localMatch);
+      } finally {
+        if (isMounted) setSearching(false);
+      }
+    };
+
+    const timer = setTimeout(searchDb, 300);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [searchTerm, allUsers, user?.id]);
 
   if (!isOpen) return null;
 
-  const cleanQuery = searchTerm.trim().toLowerCase().replace(/^@/, '');
-
-  const filteredUsers = allUsers.filter(u => {
-    if (u.id === user?.id) return false;
-    if (u.is_discoverable === false) return false;
-
-    const nameMatch = u.display_name.toLowerCase().includes(cleanQuery);
-    const usernameMatch = u.username && u.username.toLowerCase().includes(cleanQuery);
-
-    return nameMatch || usernameMatch;
-  });
+  const displayList = searchTerm.trim() 
+    ? searchResults 
+    : allUsers.filter(u => u.id !== user?.id && u.is_discoverable !== false);
 
   const handleStartChat = async (targetUserId: string) => {
     await createDirectChat(targetUserId);
@@ -49,11 +95,15 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ isOpen, onClose, onO
             <Search className="absolute left-3.5 top-3 w-4 h-4 text-[#71717A]" />
             <input
               type="text"
+              autoFocus
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="Search by name or @username..."
               className="w-full pl-10 pr-4 py-2.5 bg-[#181818] border border-[#292929] rounded-xl text-sm text-white placeholder-[#71717A] focus:outline-none focus:ring-2 focus:ring-[#E50914]"
             />
+            {searching && (
+              <Loader2 className="absolute right-3.5 top-3 w-4 h-4 text-[#E50914] animate-spin" />
+            )}
           </div>
 
           <button
@@ -64,18 +114,18 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ isOpen, onClose, onO
             <span>Create Group Chat</span>
           </button>
 
-          <div className="text-xs font-semibold uppercase tracking-wider text-[#A1A1AA] mb-2">
-            Discoverable Users ({filteredUsers.length})
+          <div className="text-xs font-semibold uppercase tracking-wider text-[#A1A1AA] mb-2 flex items-center justify-between">
+            <span>{searchTerm.trim() ? 'Search Results' : 'Discoverable Members'} ({displayList.length})</span>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-          {filteredUsers.length === 0 ? (
+          {displayList.length === 0 ? (
             <div className="text-center py-8 text-[#71717A] text-sm">
-              No users found matching "{searchTerm}"
+              {searching ? 'Searching database...' : `No users found matching "${searchTerm}"`}
             </div>
           ) : (
-            filteredUsers.map(u => (
+            displayList.map(u => (
               <div
                 key={u.id}
                 onClick={() => handleStartChat(u.id)}
